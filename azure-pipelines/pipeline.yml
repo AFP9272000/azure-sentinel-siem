@@ -24,7 +24,7 @@ variables:
     value: "law-sentinel-siem"
 
 stages:
- 
+
   # Stage 1: Security Scanning
 
   - stage: SecurityScan
@@ -37,32 +37,30 @@ stages:
             inputs:
               versionSpec: "3.11"
 
-          - script: |
-              pip install checkov
-              curl -s https://raw.githubusercontent.com/aquasecurity/tfsec/master/scripts/install_linux.sh | bash
-              curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
-            displayName: "Install Security Tools"
+          - script: pip install checkov
+            displayName: "Install Checkov"
 
-          - script: |
-              checkov -d terraform/ --output cli --soft-fail
+          - script: curl -s https://raw.githubusercontent.com/aquasecurity/tfsec/master/scripts/install_linux.sh | bash
+            displayName: "Install tfsec"
+
+          - script: curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+            displayName: "Install Trivy"
+
+          - script: checkov -d terraform/ --output cli --soft-fail
             displayName: "Checkov - Terraform"
             continueOnError: true
 
-          - script: |
-              checkov -d bicep/ --framework bicep --output cli --soft-fail
+          - script: checkov -d bicep/ --framework bicep --output cli --soft-fail
             displayName: "Checkov - Bicep"
             continueOnError: true
 
-          - script: |
-              tfsec terraform/ --soft-fail-on-all-errors
+          - script: tfsec terraform/ -s
             displayName: "tfsec Scan"
             continueOnError: true
 
-          - script: |
-              trivy fs . --severity HIGH,CRITICAL
+          - script: trivy fs . --severity HIGH,CRITICAL
             displayName: "Trivy Scan"
             continueOnError: true
-
 
   # Stage 2: Terraform
 
@@ -83,9 +81,7 @@ stages:
               azureSubscription: "sentinel-siem-service-connection"
               scriptType: "bash"
               scriptLocation: "inlineScript"
-              inlineScript: |
-                cd terraform/
-                terraform init
+              inlineScript: cd terraform/ && terraform init
               addSpnToEnvironment: true
 
           - task: AzureCLI@2
@@ -94,11 +90,7 @@ stages:
               azureSubscription: "sentinel-siem-service-connection"
               scriptType: "bash"
               scriptLocation: "inlineScript"
-              inlineScript: |
-                cd terraform/
-                terraform plan -out=tfplan \
-                  -var="alert_email=$(ALERT_EMAIL)" \
-                  -var="slack_webhook_url=$(SLACK_WEBHOOK_URL)"
+              inlineScript: cd terraform/ && terraform plan -out=tfplan -var="alert_email=$(ALERT_EMAIL)" -var="slack_webhook_url=$(SLACK_WEBHOOK_URL)"
               addSpnToEnvironment: true
 
           - task: AzureCLI@2
@@ -108,9 +100,7 @@ stages:
               azureSubscription: "sentinel-siem-service-connection"
               scriptType: "bash"
               scriptLocation: "inlineScript"
-              inlineScript: |
-                cd terraform/
-                terraform apply -auto-approve tfplan
+              inlineScript: cd terraform/ && terraform apply -auto-approve tfplan
               addSpnToEnvironment: true
 
   # Stage 3: Bicep Deployment
@@ -135,11 +125,4 @@ stages:
                     azureSubscription: "sentinel-siem-service-connection"
                     scriptType: "bash"
                     scriptLocation: "inlineScript"
-                    inlineScript: |
-                      az deployment group create \
-                        --resource-group $(resourceGroupName) \
-                        --template-file bicep/main.bicep \
-                        --parameters \
-                          workspaceName=$(workspaceName) \
-                          alertEmail=$(ALERT_EMAIL) \
-                          slackWebhookUrl=$(SLACK_WEBHOOK_URL)
+                    inlineScript: az deployment group create --resource-group $(resourceGroupName) --template-file bicep/main.bicep --parameters workspaceName=$(workspaceName) alertEmail=$(ALERT_EMAIL) slackWebhookUrl=$(SLACK_WEBHOOK_URL)
