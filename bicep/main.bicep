@@ -28,12 +28,6 @@ param resourceGroupName string = resourceGroup().name
 @description('NSG name for IP blocking')
 param nsgName string = 'nsg-sentinel-block'
 
-// Existing Resources
-
-resource workspace 'Microsoft.OperationalInsights/workspaces@2022-10-01' existing = {
-  name: workspaceName
-}
-
 // Modules
 
 module dataConnectors 'modules/data-connectors/data-connectors.bicep' = {
@@ -79,7 +73,4 @@ module automationRules 'modules/automation-rules/automation-rules.bicep' = {
     disableUserPlaybookId: logicApps.outputs.disableUserPlaybookId
     blockIpPlaybookId: logicApps.outputs.blockIpPlaybookId
   }
-  dependsOn: [
-    logicApps
-  ]
 }
