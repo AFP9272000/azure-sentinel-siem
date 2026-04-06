@@ -40,7 +40,6 @@ module dataConnectors 'modules/data-connectors/data-connectors.bicep' = {
   name: 'deploy-data-connectors'
   params: {
     workspaceName: workspaceName
-    location: location
   }
 }
 
