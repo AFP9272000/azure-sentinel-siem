@@ -1,4 +1,4 @@
-# Azure Sentinel SIEM - GitHub Actions CI/CD Pipeline
+# Azure Sentinel SIEM - GitHub Actions CI/CD Pipeline 
 # Deploys Terraform + Bicep with security scanning
 
 name: Deploy Sentinel SIEM
