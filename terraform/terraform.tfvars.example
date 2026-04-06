@@ -1,0 +1,18 @@
+# Example terraform.tfvars
+# Copy to terraform.tfvars and fill in
+# DO NOT commit terraform.tfvars to version control
+
+location                     = "eastus"
+resource_group_name          = "rg-sentinel-siem"
+log_analytics_workspace_name = "law-sentinel-siem"
+log_analytics_retention_days = 90
+alert_email                  = "email@example.com"
+slack_webhook_url            = "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+nsg_name                     = "nsg-sentinel-block"
+
+tags = {
+  Project     = "Azure-Sentinel-SIEM"
+  Environment = "Production"
+  ManagedBy   = "Terraform"
+  Owner       = "Addison"
+}

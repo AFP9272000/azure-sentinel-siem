@@ -1,0 +1,172 @@
+# Azure Sentinel SIEM - GitHub Actions CI/CD Pipeline
+# Deploys Terraform + Bicep with security scanning
+
+name: Deploy Sentinel SIEM
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  id-token: write
+  contents: read
+  security-events: write
+
+env:
+  ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+  ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+  ARM_USE_OIDC: true
+  TF_VERSION: "1.7.0"
+
+jobs:
+  # Security Scanning
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install security tools
+        run: |
+          pip install checkov
+          curl -s https://raw.githubusercontent.com/aquasecurity/tfsec/master/scripts/install_linux.sh | bash
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+
+      - name: Run Checkov (Terraform)
+        run: |
+          checkov -d terraform/ \
+            --output sarif \
+            --output-file results/checkov-terraform.sarif \
+            --soft-fail
+        continue-on-error: true
+
+      - name: Run Checkov (Bicep)
+        run: |
+          checkov -d bicep/ \
+            --framework bicep \
+            --output sarif \
+            --output-file results/checkov-bicep.sarif \
+            --soft-fail
+        continue-on-error: true
+
+      - name: Run tfsec
+        run: |
+          tfsec terraform/ \
+            --format sarif \
+            --out results/tfsec.sarif \
+            --soft-fail-on-all-errors
+        continue-on-error: true
+
+      - name: Run Trivy (filesystem)
+        run: |
+          trivy fs . \
+            --format sarif \
+            --output results/trivy.sarif \
+            --severity HIGH,CRITICAL
+        continue-on-error: true
+
+      - name: Upload SARIF - Checkov Terraform
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: results/checkov-terraform.sarif
+          category: checkov-terraform
+
+      - name: Upload SARIF - Checkov Bicep
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: results/checkov-bicep.sarif
+          category: checkov-bicep
+
+      - name: Upload SARIF - tfsec
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: results/tfsec.sarif
+          category: tfsec
+
+      - name: Upload SARIF - Trivy
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: results/trivy.sarif
+          category: trivy
+
+  # Terraform Plan (on PR) / Apply (on merge to main)
+  terraform:
+    name: Terraform
+    runs-on: ubuntu-latest
+    needs: security-scan
+    defaults:
+      run:
+        working-directory: terraform/
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        run: terraform plan -out=tfplan -var-file=terraform.tfvars
+        env:
+          TF_VAR_alert_email: ${{ secrets.ALERT_EMAIL }}
+          TF_VAR_slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Terraform Apply
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        run: terraform apply -auto-approve tfplan
+
+  # Bicep Deployment (after Terraform)
+  bicep:
+    name: Bicep Deploy
+    runs-on: ubuntu-latest
+    needs: terraform
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy Bicep
+        uses: azure/arm-deploy@v2
+        with:
+          subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          resourceGroupName: rg-sentinel-siem
+          template: bicep/main.bicep
+          parameters: >
+            workspaceName=law-sentinel-siem
+            alertEmail=${{ secrets.ALERT_EMAIL }}
+            slackWebhookUrl=${{ secrets.SLACK_WEBHOOK_URL }}
+          failOnStdErr: false
