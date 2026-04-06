@@ -1,4 +1,4 @@
-// Logic Apps Playbooks - Automated Response
+// Logic Apps Playbooks: Automated Response
 
 param location string
 @secure()
@@ -11,6 +11,7 @@ param nsgName string
 
 // Sentinel API Connection (shared by all playbooks)
 
+@description('API connection for Microsoft Sentinel')
 resource sentinelConnection 'Microsoft.Web/connections@2016-06-01' = {
   name: 'azuresentinel-connection'
   location: location
@@ -19,12 +20,11 @@ resource sentinelConnection 'Microsoft.Web/connections@2016-06-01' = {
     api: {
       id: subscriptionResourceId('Microsoft.Web/locations/managedApis', location, 'azuresentinel')
     }
-    parameterValueType: 'Alternative'
   }
 }
 
 // Playbook 1: Email Alert
--
+
 resource emailPlaybook 'Microsoft.Logic/workflows@2019-05-01' = {
   name: 'Playbook-EmailAlert'
   location: location
