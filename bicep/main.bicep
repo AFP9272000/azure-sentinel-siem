@@ -48,7 +48,6 @@ module analyticsRules 'modules/analytics-rules/analytics-rules.bicep' = {
   name: 'deploy-analytics-rules'
   params: {
     workspaceName: workspaceName
-    location: location
   }
 }
 
