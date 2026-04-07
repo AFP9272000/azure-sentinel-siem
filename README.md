@@ -1,6 +1,6 @@
 # Azure Sentinel SIEM with Automated Response
 
-Enterprise-grade cloud-native SIEM that ingests security telemetry from multiple Azure sources into Microsoft Sentinel, correlates events using custom KQL analytics rules with MITRE ATT&CK mapping, scores risk severity, and triggers automated response playbooks — reducing mean time to respond (MTTR) from manual investigation to seconds-level automated remediation.
+Enterprise-grade cloud-native SIEM that ingests security telemetry from multiple Azure sources into Microsoft Sentinel, correlates events using custom KQL analytics rules with MITRE ATT&CK mapping, scores risk severity, and triggers automated response playbooks, reducing mean time to respond (MTTR) from manual investigation to seconds-level automated remediation.
 
 ![Azure](https://img.shields.io/badge/Azure-Sentinel%20%7C%20Log%20Analytics%20%7C%20Logic%20Apps-0078D4)
 ![Detection](https://img.shields.io/badge/Detection-11%20Custom%20KQL%20Rules-blue)
@@ -28,29 +28,8 @@ A fully automated security operations platform deployed on Microsoft Sentinel wi
 
 ## Architecture
 
-```
-Data Sources                    Detection Engine                 Response & Visualization
-┌─────────────────┐     ┌──────────────────────────┐     ┌─────────────────────────┐
-│ Azure Activity   │────▶│ Microsoft Sentinel        │────▶│ Logic Apps Playbooks    │
-│ Log             │     │                          │     │                         │
-│ Entra ID Audit  │────▶│ 11 Custom KQL Analytics  │     │ ✉ Email Alerts          │
-│ Logs            │     │ Rules with MITRE ATT&CK  │     │ 💬 Slack Notifications   │
-│                 │     │ Mapping & Risk Scoring   │     │ 🔒 Auto-Disable User    │
-│ Defender for    │────▶│                          │     │ 🛡 Auto-Block IP (NSG)  │
-│ Cloud Alerts    │     │ Incident Correlation     │     │                         │
-└─────────────────┘     └──────────────────────────┘     └─────────────────────────┘
-                                    │                              │
-                                    ▼                              ▼
-                         ┌──────────────────────┐      ┌──────────────────────┐
-                         │ Sentinel Workbooks    │      │ Automation Rules     │
-                         │                      │      │                      │
-                         │ Incident Overview    │      │ Severity-based       │
-                         │ MITRE ATT&CK Heatmap │      │ routing to playbooks │
-                         │ Risk Score Analysis  │      │                      │
-                         │ Response Metrics     │      │ High → Remediation   │
-                         └──────────────────────┘      │ All  → Notification  │
-                                                       └──────────────────────┘
-```
+<img width="1171" height="731" alt="architecture sentinel drawio" src="https://github.com/user-attachments/assets/3fa55877-b40d-4a55-9004-38164c104c6a" />
+
 
 ## MITRE ATT&CK Coverage
 
