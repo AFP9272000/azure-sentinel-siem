@@ -64,44 +64,31 @@ stages:
 
   # Stage 2: Terraform
 
-  - stage: Terraform
+ - stage: Terraform
     displayName: "Terraform Deploy"
     dependsOn: SecurityScan
     jobs:
       - job: TerraformDeploy
         displayName: "Terraform Init/Plan/Apply"
         steps:
-          - task: TerraformInstaller@1
-            inputs:
-              terraformVersion: $(TF_VERSION)
-
+          - checkout: self
           - task: AzureCLI@2
-            displayName: "Terraform Init"
+            displayName: "Terraform Init, Plan, Apply"
             inputs:
               azureSubscription: "sentinel-siem-service-connection"
-              scriptType: "bash"
+              scriptType: "pscore"
               scriptLocation: "inlineScript"
-              inlineScript: cd terraform/ && terraform init
               addSpnToEnvironment: true
-
-          - task: AzureCLI@2
-            displayName: "Terraform Plan"
-            inputs:
-              azureSubscription: "sentinel-siem-service-connection"
-              scriptType: "bash"
-              scriptLocation: "inlineScript"
-              inlineScript: cd terraform/ && terraform plan -out=tfplan -var="alert_email=$(ALERT_EMAIL)" -var="slack_webhook_url=$(SLACK_WEBHOOK_URL)"
-              addSpnToEnvironment: true
-
-          - task: AzureCLI@2
-            displayName: "Terraform Apply"
-            condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
-            inputs:
-              azureSubscription: "sentinel-siem-service-connection"
-              scriptType: "bash"
-              scriptLocation: "inlineScript"
-              inlineScript: cd terraform/ && terraform apply -auto-approve tfplan
-              addSpnToEnvironment: true
+              inlineScript: |
+                $env:ARM_CLIENT_ID = $env:servicePrincipalId
+                $env:ARM_TENANT_ID = $env:tenantId
+                $env:ARM_SUBSCRIPTION_ID = az account show --query id -o tsv
+                $env:ARM_USE_OIDC = "true"
+                $env:ARM_OIDC_TOKEN = $env:idToken
+                Set-Location terraform/
+                terraform init
+                terraform plan -out=tfplan -input=false -var="alert_email=$(ALERT_EMAIL)" -var="slack_webhook_url=$(SLACK_WEBHOOK_URL)"
+                terraform apply -auto-approve tfplan
 
   # Stage 3: Bicep Deployment
 
