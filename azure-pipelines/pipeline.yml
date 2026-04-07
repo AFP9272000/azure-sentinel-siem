@@ -24,9 +24,6 @@ variables:
     value: "law-sentinel-siem"
 
 stages:
-
-  # Stage 1: Security Scanning
-
   - stage: SecurityScan
     displayName: "Security Scan"
     jobs:
@@ -36,35 +33,26 @@ stages:
           - task: UsePythonVersion@0
             inputs:
               versionSpec: "3.11"
-
           - script: pip install checkov
             displayName: "Install Checkov"
-
           - script: curl -s https://raw.githubusercontent.com/aquasecurity/tfsec/master/scripts/install_linux.sh | bash
             displayName: "Install tfsec"
-
           - script: curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
             displayName: "Install Trivy"
-
           - script: checkov -d terraform/ --output cli --soft-fail
             displayName: "Checkov - Terraform"
             continueOnError: true
-
           - script: checkov -d bicep/ --framework bicep --output cli --soft-fail
             displayName: "Checkov - Bicep"
             continueOnError: true
-
           - script: tfsec terraform/ -s
             displayName: "tfsec Scan"
             continueOnError: true
-
           - script: trivy fs . --severity HIGH,CRITICAL
             displayName: "Trivy Scan"
             continueOnError: true
 
-  # Stage 2: Terraform
-
- - stage: Terraform
+  - stage: Terraform
     displayName: "Terraform Deploy"
     dependsOn: SecurityScan
     jobs:
@@ -90,8 +78,6 @@ stages:
                 terraform plan -out=tfplan -input=false -var="alert_email=$(ALERT_EMAIL)" -var="slack_webhook_url=$(SLACK_WEBHOOK_URL)"
                 terraform apply -auto-approve tfplan
 
-  # Stage 3: Bicep Deployment
-
   - stage: Bicep
     displayName: "Bicep Deploy"
     dependsOn: Terraform
@@ -105,11 +91,11 @@ stages:
             deploy:
               steps:
                 - checkout: self
-
                 - task: AzureCLI@2
                   displayName: "Deploy Bicep"
                   inputs:
                     azureSubscription: "sentinel-siem-service-connection"
-                    scriptType: "bash"
+                    scriptType: "pscore"
                     scriptLocation: "inlineScript"
+                    addSpnToEnvironment: true
                     inlineScript: az deployment group create --resource-group $(resourceGroupName) --template-file bicep/main.bicep --parameters workspaceName=$(workspaceName) alertEmail=$(ALERT_EMAIL) slackWebhookUrl=$(SLACK_WEBHOOK_URL)
